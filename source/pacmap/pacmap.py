@@ -14,6 +14,7 @@ from sklearn.decomposition import TruncatedSVD, PCA
 from sklearn.utils.validation import check_is_fitted
 from sklearn import preprocessing
 from annoy import AnnoyIndex
+from typing import Optional
 
 global _RANDOM_STATE
 _RANDOM_STATE = None
@@ -747,9 +748,9 @@ def attach_index(reducer, index_path: str):
 
 
 def load(
-        common_prefix: str | None = None,
-        reducer_path: str | None = None,
-        index_path: str | None = None,
+        common_prefix: Optional[str] = None,
+        reducer_path: Optional[str] = None,
+        index_path: Optional[str] = None,
     ):
     '''
     Load PaCMAP instance from a location specified by the user.
@@ -894,6 +895,13 @@ class PaCMAP(BaseEstimator):
                 pass
             self.random_state = 0
             _RANDOM_STATE = None  # Reset random state
+
+        # Raise error on initialization with an incorrect distance metric.
+        VALID_ANNOY_METRICS = {"angular", "euclidean", "manhattan", "hamming", "dot"}
+        if self.distance not in VALID_ANNOY_METRICS:
+            raise NotImplementedError(
+                "`distance` must be one of {}".format(", ".join(VALID_ANNOY_METRICS))
+            )
 
         if self.n_components < 1:
             raise ValueError(
@@ -1086,14 +1094,15 @@ class PaCMAP(BaseEstimator):
                                                  self.distance,
                                                  self.verbose
                                                  )
-        if not save_pairs:
-            self.pair_XP = None
-
         # Initialize and Optimize the embedding
         Y, intermediate_states = pacmap_fit(X, self.embedding_, self.n_components, self.pair_XP, self.lr,
                                             self.num_iters, init, self.verbose,
                                             self.intermediate, self.intermediate_snapshots,
                                             self.pca_solution, self.tsvd_transformer)
+
+        if not save_pairs:
+            self.pair_XP = None
+
         if self.intermediate:
             return intermediate_states
         else:
